@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 
 	"cloud.google.com/go/pubsub"
 )
@@ -22,13 +23,16 @@ func main() {
 
 	var stop = make(chan bool)
 
-	go func() {
-		log.Println("Worker Default")
+	go func(stop chan bool) {
+		log.Println("----- Worker Default -----")
 		subID := "mocca-topic-sub"
 		err = client.Subscription(subID).Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
-			log.Println("WOrker Defauilt got message", string(msg.Data))
-			log.Println("WOrker Defauilt ordering key", string(msg.OrderingKey))
-			if string(msg.Data) == "KIMINOTO" {
+			log.Println("Worker Default [Message]", string(msg.Data))
+			log.Println("Worker Default [Ordering Key]", string(msg.OrderingKey))
+			if strings.ToUpper(string(msg.Data)) == "KIMINOTO" || strings.ToUpper(string(msg.Data)) == "EXIT" {
+				if strings.ToUpper(string(msg.Data)) == "EXIT" {
+					stop <- true
+				}
 				msg.Nack()
 			} else {
 				msg.Ack()
@@ -36,20 +40,20 @@ func main() {
 			}
 		})
 		if err != nil {
-			log.Default().Println("Error mocca-topic-sub", err.Error())
+			log.Println("Worker Default Error", err.Error())
 		}
-	}()
+	}(stop)
 
 	go func() {
-		log.Println("Worker Error")
+		log.Println("----- Worker DLQ -----")
 		subID := "mocca-dlq-topic-sub"
 		err = client.Subscription(subID).Receive(ctx, func(ctx context.Context, msg *pubsub.Message) {
-			log.Println("WOrker error  got message DLQ", string(msg.Data))
-			log.Println("WOrker Defauilt  got key", string(msg.OrderingKey))
+			log.Println("Worker DLQ [Message]", string(msg.Data))
+			log.Println("Worker DLQ [Ordering Key]", string(msg.OrderingKey))
 			msg.Ack()
 		})
 		if err != nil {
-			log.Default().Println("Error mocca-dlq-topic-subb", err.Error())
+			log.Println("Worker DLQ Error", err.Error())
 		}
 	}()
 
